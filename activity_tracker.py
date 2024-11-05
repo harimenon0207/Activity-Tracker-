@@ -64,11 +64,10 @@ app.layout = html.Div([
     dcc.DatePickerRange(id='date-picker-range'),
     dash_table.DataTable(id='average-daily-table'),
     
-    # Heatmap for 'Type' with user input on date range
-    html.Label('Select date range for heatmap (default last 3 days):'),
-    dcc.DatePickerRange(id='heatmap-date-picker'),
+    # Calendar heatmap for 'Type' with hour and day granularity
+    html.Label('Select Type for Calendar Heatmap:'),
     dcc.Input(id='heatmap-type-input', placeholder='Enter Type', type='text'),
-    dcc.Graph(id='heatmap')
+    dcc.Graph(id='calendar-heatmap')
 ])
 
 # Global variable to store uploaded data
@@ -151,25 +150,49 @@ def update_average_table(start_date, end_date):
     })
     return result_df.to_dict('records')
 
-# Callback to generate heatmap based on date range and 'Type'
+# Callback to generate calendar heatmap based on type selection
 @app.callback(
-    Output('heatmap', 'figure'),
-    [Input('heatmap-date-picker', 'start_date'),
-     Input('heatmap-date-picker', 'end_date'),
-     Input('heatmap-type-input', 'value')]
+    Output('calendar-heatmap', 'figure'),
+    [Input('heatmap-type-input', 'value')]
 )
-def update_heatmap(start_date, end_date, type_value):
+def update_calendar_heatmap(type_value):
     if uploaded_data is None or type_value is None:
         return {}
-    
-    filtered_data = uploaded_data[(uploaded_data['Start'].dt.date >= pd.to_datetime(start_date).date()) & 
-                                  (uploaded_data['Start'].dt.date <= pd.to_datetime(end_date).date()) & 
-                                  (uploaded_data['Type'] == type_value)]
 
-    # Group by hour of the day
+    # Filter data for selected type
+    filtered_data = uploaded_data[uploaded_data['Type'] == type_value]
+    
+    # Extract day and hour from 'Start' timestamp
+    filtered_data['Day'] = filtered_data['Start'].dt.date
     filtered_data['Hour'] = filtered_data['Start'].dt.hour
-    heatmap_data = filtered_data.groupby(['Hour']).size().reset_index(name='Event Count')
-    fig = px.density_heatmap(heatmap_data, x='Hour', y='Event Count', title=f'Hourly Heatmap for {type_value}')
+    
+    # Generate a pivot table with counts by day and hour
+    heatmap_data = filtered_data.pivot_table(index='Hour', columns='Day', aggfunc='size', fill_value=0)
+    
+    # Create heatmap figure
+    fig = go.Figure(
+        data=go.Heatmap(
+            z=heatmap_data.values,
+            x=heatmap_data.columns,
+            y=heatmap_data.index,
+            colorscale='Viridis',
+            colorbar=dict(title="Number of Events"),
+            hoverongaps=False
+        )
+    )
+    
+    # Set titles and labels for the heatmap
+    fig.update_layout(
+        title=f'Calendar Heatmap of Events by Hour and Day for {type_value}',
+        xaxis_title='Date',
+        yaxis_title='Hour of Day',
+        yaxis=dict(dtick=1),
+        xaxis=dict(
+            tickformat="%Y-%m-%d",
+            tickmode='array',
+            tickvals=heatmap_data.columns
+        )
+    )
 
     return fig
 
