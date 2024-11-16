@@ -202,4 +202,4 @@ def update_calendar_heatmap(type_value):
     return fig
 
 if __name__ == '__main__':
-    app.run_server(debug=True)
+    app.run_server(debug=True,port=8400)
