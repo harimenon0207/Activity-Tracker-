@@ -87,8 +87,12 @@ def handle_file_upload(contents, filename):
     
     if contents:
         try:
-            # Decode content and read into a DataFrame
-            df = pd.read_csv(filename)
+            # Decode the content from base64
+            content_type, content_string = contents.split(',')
+            decoded_content = base64.b64decode(content_string)
+            
+            # Read the CSV into a DataFrame
+            df = pd.read_csv(io.StringIO(decoded_content.decode('utf-8')))
             
             # Validate the format
             validate_csv_columns(df)
@@ -111,6 +115,7 @@ def handle_file_upload(contents, filename):
         except Exception as e:
             return f"Error: {str(e)}", [], None, None
     return '', [], None, None
+
 
 # Callback to update chart and table based on 'Type' selection
 @app.callback(
